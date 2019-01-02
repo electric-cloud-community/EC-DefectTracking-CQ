@@ -1,0 +1,314 @@
+# -*-Perl-*-
+
+# cq.ntest -
+#
+# Exercise procedure UpdateDefects in EC-DefectTracking-CQ
+#
+# Copyright (c) 2005-2010 Electric Cloud, Inc.
+# All rights reserved
+
+use strict;
+use ECTest;
+use ECSelenium;
+
+# read in setup and tests that are common to all EC-DefectTracking plugins 
+# system tests
+require "$::gTestFileDir/../../EC-DefectTracking/systemtest/ntest.common";
+
+$::gProjectImported = 0;
+$::gConfigCreated = 0;
+
+sub importProject() {
+    assertOK($::N->import(
+             { file =>"$::gTestFileDir/cq-UpdateDefects.xml",
+               path  => "/projects/cq-UpdateDefects",
+               force => 1
+             } ), "import cq-UpdateDefects project");
+    assertOK($::N->getProcedure("cq-UpdateDefects", "cfgDoesNotExist"),"cfgDoesNotExist procedure exists");
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultShell","cqperl"));
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultResource","cq"));
+    $::gProjectImported = 1;
+}
+
+sub createConfig() {
+    my $xpath = $::N->runProcedure("$::gPlugin_name", 
+        { procedureName => "CreateConfiguration",
+          pollInterval  => '0.2',
+          timeout       => 600,
+          actualParameter => [ 
+            { actualParameterName => 'config', value => "cqConfig" }, 
+            { actualParameterName => 'desc', value => "CQ configuration" }, 
+            { actualParameterName => 'database', value => "SAMPL" },
+            { actualParameterName => 'schema', value => "" }, 
+            { actualParameterName => 'credential', value => "test" }, 
+          ],
+          credential => [ 
+            { credentialName => 'test', userName => "build", password => "Mbimp,vm", },
+          ],
+        });
+
+    assertOK($xpath, "run create configuration procedure");
+    # make sure it finished
+    my $jobId = 0;
+    my $status = "";
+    assertDef($xpath, "runProcedure finished without a timeout");
+    if ($xpath) {
+        $jobId  = $xpath->findvalue("//jobId");
+        $status = $xpath->findvalue("//status");
+
+        assertTrue($jobId && $jobId ne "",'valid job id');
+        assertEq('completed',$status,"job $jobId complete");
+
+        #abort if job did not finish
+        if ($status ne "completed") {
+            assertOK($::N->abortJob($jobId, {force => 1}));
+        }
+    }
+
+    # examine log files
+    $xpath = $::N->getJobDetails($jobId);
+
+    writeFile("$::gCurrentTestDir/createConfiguration.log","====Job Details====\n$xpath->{_xml}\n");
+
+    # check that the config and credential exist
+    $xpath = $::N->getProperty("/projects/$::ECdt/defectTracking_cfgs/cqConfig/defectTrackingPlugin");
+    assertEq("EC-DefectTracking-CQ",$xpath->findvalue("//value")->string_value, "configuration type");
+    $xpath = $::N->getCredential("$::ECdt","cqConfig");
+    assertEq("build",$xpath->findvalue("//userName")->string_value, 'Credential user');
+
+    $::gConfigCreated = 1;
+}
+
+sub doSetup() {
+
+    if(! $::gProjectImported) {
+        importProject();
+    }
+
+    if (! $::gConfigCreated) {
+        createConfig();
+    }
+}
+
+ntest "cfgDoesNotExist", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdcfgDoesNotExist();
+
+    writeFile("$::gCurrentTestDir/cfgDoesNotExist.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Could not find configuration cfgDoesNotExist", $data, "cfgDoesNotExist output");
+};
+
+sub runFakeCmdcfgDoesNotExist
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cfgDoesNotExist ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Could not find configuration cfgDoesNotExist";
+    
+    return $log;
+}
+
+ntest "propertyDoesNotExist", {}, sub {
+    
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyDoesNotExist();
+
+    writeFile("$::gCurrentTestDir/propertyDoesNotExist.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Error querying for /myJob/propertyDoesNotExist as a property", $data, "propertyDoesNotExist output");
+};
+
+sub runFakeCmdpropertyDoesNotExist
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Error querying for /myJob/propertyDoesNotExist as a property";
+    
+    return $log;
+}
+
+ntest "propertyContainsInaccessibleDefectIDs", {}, sub {    
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyContainsInaccessibleDefectIDs();
+
+    writeFile("$::gCurrentTestDir/propertyContainsInaccessibleDefectIDs.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("There is a reference to an object that does not exist", $data, "propertyContainsInaccessibleDefectIDs output");
+}; 
+
+sub runFakeCmdpropertyContainsInaccessibleDefectIDs
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000099=Resolve
+Current Pair: SAMPL00000099=Resolve
+Current idDefect: SAMPL00000099
+Current valueDefect: Resolve
+Error: failed trying to udpate SAMPL00000099 to Resolve status, with error: An error was detected retrieving information from the ClearQuest database.
+There is a reference to an object that does not exist:
+  Object Type: Entity
+  Object: \"33554531\" of record type \"Defect\"
+This error was detected at: ClearQuest Core:adentitymgr.cpp:861
+Recommendation: If you cannot determine how to resolve this issue, contact Rational Support and provide all the above information as well as a description of the context in which the message occurred. at (eval 28) line 189.
+ 
+ 
+Defects update completed with some Errors
+action updateDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "propertyContainsOneDefectID", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyContainsOneDefectID();
+
+    writeFile("$::gCurrentTestDir/propertyContainsOneDefectID.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Current Pair: SAMPL00000013=Resolve", $data, "propertyContainsOneDefectID output");
+};
+
+sub runFakeCmdpropertyContainsOneDefectID
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000013=Resolve
+Current Pair: SAMPL00000013=Resolve
+Current idDefect: SAMPL00000013
+Current valueDefect: Resolve
+Error: failed trying to udpate SAMPL00000013 to Resolve status, with error: The action Resolve cannot be applied, at present, to the entity \"SAMPL00000013\" (of type \"Defect\").  Most likely the entity is in the wrong state for the action to occur, or the current user does not have permission. at (eval 28) line 190.
+ 
+ 
+Defects update completed with some Errors
+action updateDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "propertyContainsTwoDefectID", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyContainsTwoDefectID();
+
+    writeFile("$::gCurrentTestDir/propertyContainsTwoDefectID.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Current idDefect: SAMPL00000001", $data, "propertyContainsTwoDefectID output");
+    assertSubstring("Current idDefect: SAMPL00000002", $data, "propertyContainsTwoDefectID output");
+};
+
+sub runFakeCmdpropertyContainsTwoDefectID
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000001=Resolve,SAMPL00000002=Close
+Current Pair: SAMPL00000001=Resolve
+Current idDefect: SAMPL00000001
+Current valueDefect: Resolve
+Error: failed trying to udpate SAMPL00000001 to Resolve status, with error: The action Resolve cannot be applied, at present, to the entity SAMPL00000001 (of type Defect).  Most likely the entity is in the wrong state for the action to occur, or the current user does not have permission. at (eval 28) line 190.
+ 
+ 
+Current Pair: SAMPL00000002=Close
+Current idDefect: SAMPL00000002
+Current valueDefect: Close
+Error: failed trying to udpate SAMPL00000002 to Close status, with error: The action Close cannot be applied, at present, to the entity SAMPL00000002 (of type Defect).  Most likely the entity is in the wrong state for the action to occur, or the current user does not have permission. at (eval 28) line 190.
+ 
+ 
+Defects update completed with some Errors
+action updateDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "closeDefectIssue", {}, sub {
+    
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdcloseDefectIssue();
+
+    writeFile("$::gCurrentTestDir/closeDefectIssue.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Current Pair: SAMPL00000001=Close", $data, "closeDefectIssue output");
+};
+
+sub runFakeCmdcloseDefectIssue
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000001=Close
+Current Pair: SAMPL00000001=Close
+Current idDefect: SAMPL00000001
+Current valueDefect: Close
+Error: failed trying to udpate SAMPL00000001 to Close status, with error: The action Close cannot be applied, at present, to the entity SAMPL00000001 (of type Defect).  Most likely the entity is in the wrong state for the action to occur, or the current user does not have permission. at (eval 28) line 190.
+ 
+Defects update completed with some Errors
+action updateDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "propertyDefectIDAlreadyResolved", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyDefectIDAlreadyResolved();
+
+    writeFile("$::gCurrentTestDir/propertyDefectIDAlreadyResolved.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("The action Resolve cannot be applied, at present, to the entity", $data, "propertyDefectIDAlreadyResolved output");
+};
+
+sub runFakeCmdpropertyDefectIDAlreadyResolved
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000026=Resolve
+Current Pair: SAMPL00000026=Resolve
+Current idDefect: SAMPL00000026
+Current valueDefect: Resolve
+Error: failed trying to udpate SAMPL00000026 to Resolve status, with error: The action Resolve cannot be applied, at present, to the entity SAMPL00000026 (of type Defect).  Most likely the entity is in the wrong state for the action to occur, or the current user does not have permission. at (eval 28) line 190.
+ 
+Defects update completed with some Errors
+action updateDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "propertyFormatError", {}, sub {    
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertyFormatError();
+
+    writeFile("$::gCurrentTestDir/propertyFormatError.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Error: Property format error", $data, "propertyFormatError output");
+};
+
+sub runFakeCmdpropertyFormatError
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Property : SAMPL00000026
+Current Pair: SAMPL00000026
+Current idDefect: SAMPL00000026
+Current valueDefect: 
+Error: Property format error
+action updateDefects returned:";
+    
+    return $log;
+}

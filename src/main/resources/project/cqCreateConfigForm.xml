@@ -1,0 +1,36 @@
+<editor>
+    <formElement>
+        <type>entry</type>
+        <label>Configuration Name:</label>
+        <property>config</property>
+        <required>1</required>
+	<documentation>Provide a unique name for the configuration, keeping in mind that you may need to create additional configurations over time.</documentation>
+    </formElement>
+    <formElement>
+        <type>textarea</type>
+        <label>Description:</label>
+        <property>desc</property>
+        <documentation>You can supply a text description for your reference only. Commander does not use this information.</documentation>
+        <value>ClearQuest configuration</value>
+    </formElement>
+    <formElement>
+        <type>credential</type>
+        <label>Login As:</label>
+        <property>credential</property>
+        <required>1</required>
+        <documentation>The user name and password to use to connect to the specified ClearQuest Server.</documentation>
+    </formElement>
+    <formElement>
+        <type>entry</type>
+        <label>Database:</label>
+        <property>database</property>
+        <required>1</required>
+        <documentation>The Database name to a ClearQuest server.</documentation>
+    </formElement>
+    <formElement>
+        <type>entry</type>
+        <label>Schema:</label>
+        <property>schema</property>        
+        <documentation>The Database Schema.</documentation>
+    </formElement>
+</editor>

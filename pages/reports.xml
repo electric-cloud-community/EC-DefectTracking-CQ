@@ -1,0 +1,7 @@
+<configDefinition>
+  <title>ClearQuest Report</title>
+  <!-- <helpLink>/link/showHelp?page=jirahelp</helpLink> -->
+    <componentContainer>
+         <component plugin="@PLUGIN_KEY@" version="@PLUGIN_VERSION@" ref="Reports" />
+    </componentContainer>  
+</configDefinition>

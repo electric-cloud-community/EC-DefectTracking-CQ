@@ -1,0 +1,21 @@
+    <editor>
+	<help>/commander/pages/@PLUGIN_KEY@-@PLUGIN_VERSION@/EC-DefectTracking-CQ_help?s=Administration&amp;ss=Plugins#CreateDefects</help>
+        <formElement>
+            <type>entry</type>
+            <label>Configuration Name:</label>
+            <property>config</property>
+			<required>1</required>
+            <documentation>Provide the name of your ClearQuest Defect Tracking configuration, or leave it blank to use the "default" configuration.</documentation>
+        </formElement>       
+		
+		<formElement>
+            <type>radio</type>
+            <label>Creation Mode:</label>
+            <property>mode</property>
+			<value>automatic</value>
+            <documentation>Select Automatic if the defects should be created during job execution without user input. Select Manual to require a user to manually submit a defect from a Defect Report page linked to a Job Details page.</documentation>
+            <option><name>Automatic</name><value>automatic</value></option>
+            <option><name>Manual</name><value>manual</value></option>            
+        </formElement> 
+		
+    </editor>

@@ -1,0 +1,19 @@
+    <editor>
+	<help>/commander/pages/@PLUGIN_KEY@-@PLUGIN_VERSION@/EC-DefectTracking-CQ_help?s=Administration&amp;ss=Plugins#UpdateDefects</help>
+        <formElement>
+            <type>entry</type>
+            <label>Configuration Name:</label>
+            <property>config</property>
+			<required>1</required>
+			<documentation>Provide the name of your ClearQuest Defect Tracking configuration, or leave it blank to use the "default" configuration.</documentation>
+        </formElement>
+
+        <formElement>
+            <type>entry</type>
+            <label>Property Path:</label>
+            <property>property</property>
+			<required>1</required>
+            <documentation>Provide the path to the property if the property containing the list of defects to update is somewhere other than "/myJob/defectsToUpdate".</documentation>
+        </formElement>
+		
+    </editor>

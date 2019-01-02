@@ -1,0 +1,56 @@
+# -*-Perl-*-
+
+# cq.ntest -
+#
+# Exercise basic components of EC-DefectTracking-CQ plugin
+#
+# Copyright (c) 2005-2010 Electric Cloud, Inc.
+# All rights reserved
+
+use strict;
+
+# read in setup and tests that are common to all EC-DefectTracking plugin 
+# system tests
+require "$::gTestFileDir/../../EC-DefectTracking/systemtest/ntest.common";
+
+$::gPlugin_driver =~ s/-/::/g;
+
+ntest "check-CreateConfiguration-present", {}, sub {
+    # Check that the plugin contains required components
+    my $xpath = $::N->getSteps("$::gPlugin_name","CreateConfiguration");
+    assertOK($xpath,"get steps");
+    assertEq("Create configuration", $xpath->findvalue("//step[1]/stepName"), "step 1: Create configuration");
+};
+
+ntest "check-LinkDefects-present", {}, sub {
+    my $xpath = $::N->getSteps("$::gPlugin_name","LinkDefects");
+    assertOK($xpath, "get steps");
+    assertEq("CQ - Link Defects", $xpath->findvalue("//step[1]/stepName"), "step 1: CQ - Link Defects");
+
+};
+
+ntest "check-UpdateDefects-present", {}, sub {
+    my $xpath = $::N->getSteps("$::gPlugin_name","UpdateDefects");
+    assertOK($xpath, "get steps");
+    assertEq("CQ - Update Defects", $xpath->findvalue("//step[1]/stepName"), "step 1: CQ - Update Defects");
+
+};
+
+ntest "check-CreateDefects-present", {}, sub {
+    my $xpath = $::N->getSteps("$::gPlugin_name","CreateDefects");
+    assertOK($xpath, "get steps");
+    assertEq("CQ - Create Defects", $xpath->findvalue("//step[1]/stepName"), "step 1: CQ - Create Defects");
+
+};
+
+ntest "check-config code-present", {}, sub {
+    my $xpath = $::N->getProperty("/projects/$::gPlugin_name/defectTracking_driver/$::gPlugin_driver" . "::Cfg");
+    assertOK($xpath,"get cfg property");
+    assertNe("", $xpath->findvalue("//value"), "Config Code");
+};
+
+ntest "check-driver code-present", {}, sub {
+    my $xpath = $::N->getProperty("/projects/$::gPlugin_name/defectTracking_driver/$::gPlugin_driver" . "::Driver");
+    assertOK($xpath,"get driver property");
+};
+

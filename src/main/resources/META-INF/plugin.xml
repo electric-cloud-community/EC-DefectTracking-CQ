@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <key>@PLUGIN_KEY@</key>
+  <version>@PLUGIN_VERSION@</version>
+  <label>@PLUGIN_KEY@</label>
+  <description>ClearQuest plugin</description>
+  <author>Electric Cloud</author>
+  <authorUrl>http://www.electric-cloud.com/support</authorUrl>
+  <commander-version min="3.6"/>
+  <depends min="1.1.1">EC-DefectTracking</depends>
+  <category>Defect Tracking</category>
+  <customTypes>
+    <customType name="reports">
+      <displayName>Display ClearQuest Report</displayName>
+      <description>description for ClearQuest reports custom type.</description>
+      <page pageName="CQReports" definition="pages/reports.xml"/>
+    </customType>
+  </customTypes>
+  <components>
+    <component name="Reports">
+      <javascript>war/ecplugins.defectTracking.Reports/ecplugins.defectTracking.Reports.nocache.js</javascript>
+    </component>
+  </components>
+  <help>EC-DefectTracking-CQ_help.xml</help>
+</plugin>

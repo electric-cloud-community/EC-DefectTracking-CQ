@@ -1,0 +1,279 @@
+# -*-Perl-*-
+
+# cq.ntest -
+#
+# Exercise procedure LinkDefects in EC-DefectTracking-CQ
+#
+# Copyright (c) 2005-2010 Electric Cloud, Inc.
+# All rights reserved
+
+use strict;
+use ECTest;
+use ECSelenium;
+
+# read in setup and tests that are common to all EC-DefectTracking plugins 
+# system tests
+require "$::gTestFileDir/../../EC-DefectTracking/systemtest/ntest.common";
+
+$::gProjectImported = 0;
+$::gConfigCreated = 0;
+
+sub importProject() {
+    assertOK($::N->import(
+             { file =>"$::gTestFileDir/cq-LinkDefects.xml",
+               path  => "/projects/cq-LinkDefects",
+               force => 1
+             } ), "import cq-LinkDefects project");
+    assertOK($::N->getProcedure("cq-LinkDefects", "cfgDoesNotExist"),"cfgDoesNotExist procedure exists");
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultShell","cqperl"));
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultResource","cq"));
+    $::gProjectImported = 1;
+}
+
+sub createConfig() {
+    my $xpath = $::N->runProcedure("$::gPlugin_name", 
+        { procedureName => "CreateConfiguration",
+          pollInterval  => '0.2',
+          timeout       => 600,
+          actualParameter => [ 
+            { actualParameterName => 'config', value => "cqConfig" }, 
+            { actualParameterName => 'desc', value => "CQ configuration" }, 
+            { actualParameterName => 'database', value => "SAMPL" },
+            { actualParameterName => 'schema', value => "" }, 
+            { actualParameterName => 'credential', value => "test" }, 
+          ],
+          credential => [ 
+            { credentialName => 'test', userName => "build", password => "Mbimp,vm", },
+          ],
+        });
+
+    assertOK($xpath, "run create configuration procedure");
+    # make sure it finished
+    my $jobId = 0;
+    my $status = "";
+    assertDef($xpath, "runProcedure finished without a timeout");
+    if ($xpath) {
+        $jobId  = $xpath->findvalue("//jobId");
+        $status = $xpath->findvalue("//status");
+
+        assertTrue($jobId && $jobId ne "",'valid job id');
+        assertEq('completed',$status,"job $jobId complete");
+
+        #abort if job did not finish
+        if ($status ne "completed") {
+            assertOK($::N->abortJob($jobId, {force => 1}));
+        }
+    }
+
+    # examine log files
+    $xpath = $::N->getJobDetails($jobId);
+
+    writeFile("$::gCurrentTestDir/createConfiguration.log","====Job Details====\n$xpath->{_xml}\n");
+
+    # check that the config and credential exist
+    $xpath = $::N->getProperty("/projects/$::ECdt/defectTracking_cfgs/cqConfig/defectTrackingPlugin");
+    assertEq("EC-DefectTracking-CQ",$xpath->findvalue("//value")->string_value, "configuration type");
+    $xpath = $::N->getCredential("$::ECdt","cqConfig");
+    assertEq("build",$xpath->findvalue("//userName")->string_value, 'Credential user');
+
+    $::gConfigCreated = 1;
+}
+
+sub doSetup() {
+
+    if(! $::gProjectImported) {
+        importProject();
+    }
+
+    if (! $::gConfigCreated) {
+        createConfig();
+    }
+}
+
+ntest "cfgDoesNotExist", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdcfgDoesNotExist();
+
+    writeFile("$::gCurrentTestDir/cfgDoesNotExist.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Could not find configuration cfgDoesNotExist", $data, "cfgDoesNotExist output");
+};
+
+sub runFakeCmdcfgDoesNotExist
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cfgDoesNotExist ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Could not find configuration cfgDoesNotExist";
+    
+    return $log;
+}
+
+ntest "noDefaultProperty", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdrunFakeCmdnoDefaultProperty();
+
+    writeFile("$::gCurrentTestDir/noDefaultProperty.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("No defect IDs found, returning", $data, "noDefaultProperty output");
+};
+
+sub runFakeCmdrunFakeCmdnoDefaultProperty
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Parsing property /myJob/ecscm_changeLogs for defect IDs
+Error querying for /myJob/ecscm_changeLogs as a property sheet: error [NoSuchProperty]: Invalid property path: Evaluating property '/myJob/ecscm_changeLogs' in jobStep 'runMethod'
+Found job 'job_8892_201008191056'
+Failed to find property 'ecscm_changeLogs'
+Evaluation failed
+Details:
+Evaluating property '/myJob/ecscm_changeLogs' in jobStep 'runMethod'
+Found job 'job_8892_201008191056'
+Failed to find property 'ecscm_changeLogs'
+Evaluation failed
+Trying to query for /myJob/ecscm_changeLogs as property...
+Error querying for /myJob/ecscm_changeLogs as a property: error [NoSuchProperty]: Property '/myJob/ecscm_changeLogs' does not exist
+Details:
+Evaluating property '/myJob/ecscm_changeLogs' in jobStep 'runMethod'
+Found job 'job_8892_201008191056'
+Failed to find property 'ecscm_changeLogs'
+Evaluation failed
+
+No defect IDs found, returning
+action linkDefects returned:";
+    
+    return $log;
+}
+
+ntest "emptyDefaultProperty", {}, sub {
+    
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdemptyDefaultProperty();
+
+    writeFile("$::gCurrentTestDir/emptyDefaultProperty.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("No change logs found, returning", $data, "emptyDefaultProperty-logs output");
+    assertSubstring("No defect IDs found, returning", $data, "emptyDefaultProperty-ids output");
+
+};
+
+sub runFakeCmdemptyDefaultProperty
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Parsing property /myJob/ecscm_changeLogs for defect IDs
+Error querying for /myJob/ecscm_changeLogs as a property sheet: error [InvalidPropertyValue]: Incorrect object type at '/myJob/ecscm_changeLogs': string[ecscm_changeLogs=,id=112905]
+Trying to query for /myJob/ecscm_changeLogs as property...
+No change logs found, returning
+No defect IDs found, returning
+action linkDefects returned:";
+    
+    return $log;
+}
+
+ntest "emptyPropertiesInDefaultPropertySheet", {}, sub {
+   
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdemptyPropertiesInDefaultPropertySheet();
+
+    writeFile("$::gCurrentTestDir/emptyPropertiesInDefaultPropertySheet.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("No change logs found, returning", $data, "emptyPropertiesInDefaultPropertySheet-logs output");
+    assertSubstring("No defect IDs found, returning", $data, "emptyPropertiesInDefaultPropertySheet-ids output");
+
+};
+
+sub runFakeCmdemptyPropertiesInDefaultPropertySheet
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Parsing property /myJob/ecscm_changeLogs for defect IDs
+No change logs found, returning
+No defect IDs found, returning
+action linkDefects returned:";
+    
+    return $log;
+}
+
+ntest "defaultPropertyContainsInaccessibleDefectIDs", {}, sub {
+  
+    # Read the log file and verify its contents.
+    my $data = runFakeCmddefaultPropertyContainsInaccessibleDefectIDs();
+
+    writeFile("$::gCurrentTestDir/defaultPropertyContainsInaccessibleDefectIDs.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Error trying to get CQ defect=aaa-111: The record id 'aaa-' does not start with the name of a known database", $data, "defaultPropertyContainsInaccessibleDefectIDs output");
+};
+
+sub runFakeCmddefaultPropertyContainsInaccessibleDefectIDs
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Parsing property /myJob/ecscm_changeLogs for defect IDs
+Error querying for /myJob/ecscm_changeLogs as a property sheet: error [InvalidPropertyValue]: Incorrect object type at '/myJob/ecscm_changeLogs': string[ecscm_changeLogs=aaa-111,id=112929]
+Trying to query for /myJob/ecscm_changeLogs as property...
+Using default pattern to search for defect IDs
+Found defect ID: aaa-111
+Error trying to get CQ defect=aaa-111: The record id 'aaa-' does not start with the name of a known database. at (eval 28) line 557.
+
+Key: aaa-111 Name: 
+action linkDefects returned: 0";
+    
+    return $log;
+}
+
+ntest "customPrefix", {}, sub {
+   
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdcustomPrefix();
+
+    writeFile("$::gCurrentTestDir/jobDetails.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring('Using supplied prefix=SAMPL to search for defects IDs', $data,"customPrefix-prefix output");
+    assertSubstring(outdent('
+           |Found defect ID: SAMPL00000001
+            Found defect ID: SAMPL00000002
+            Found defect ID: SAMPL00000003
+            '), $data, "customPrefix-ids output");
+
+    assertSubstring("Creating link /commander/pages/EC-DefectTracking-CQ-", $data, "customPrefix-link output");
+};
+
+sub runFakeCmdcustomPrefix
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqConfig ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Parsing property /myJob/ecscm_changeLogs for defect IDs
+Error querying for /myJob/ecscm_changeLogs as a property sheet: error [InvalidPropertyValue]: Incorrect object type at '/myJob/ecscm_changeLogs': string[ecscm_changeLogs=------------------------- djatnieks -------------------------
+
+
+    Fix localized MultiSeries and VOT reports not getting registered in reports tab;
+    refactor perl command block code,id=112942]
+Trying to query for /myJob/ecscm_changeLogs as property...
+Using supplied prefix=SAMPL to search for defects IDs
+Found defect ID: SAMPL00000001
+Found defect ID: SAMPL00000002
+Found defect ID: SAMPL00000003
+Key: SAMPL00000002 Name: SAMPL00000002: sales tax incorrect if item deleted from purchase, PROJECT:Classics STATUS=Resolved
+Key: SAMPL00000003 Name: SAMPL00000003: cancel sale doesn't correctly repaint screen, PROJECT:Classics STATUS=Resolved
+Key: SAMPL00000001 Name: SAMPL00000001: spelling error in login screen, PROJECT:Classics STATUS=Resolved
+Creating link /commander/pages/EC-DefectTracking-CQ-1.0.0.0/reports?jobId=8896
+action linkDefects returned: ";
+    
+    return $log;
+}
+

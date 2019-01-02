@@ -1,0 +1,240 @@
+# -*-Perl-*-
+
+# cq.ntest -
+#
+# Exercise procedure CrateDefects in EC-DefectTracking-CQ
+#
+# Copyright (c) 2005-2010 Electric Cloud, Inc.
+# All rights reserved
+
+use strict;
+use ECTest;
+use ECSelenium;
+
+# read in setup and tests that are common to all EC-DefectTracking plugins 
+# system tests
+require "$::gTestFileDir/../../EC-DefectTracking/systemtest/ntest.common";
+
+$::gProjectImported = 0;
+$::gConfigCreated = 0;
+
+
+sub importProject() {
+    assertOK($::N->import(
+             { file =>"$::gTestFileDir/cq-CreateDefects.xml",
+               path  => "/projects/cq-CreateDefects",
+               force => 1
+             } ), "import cq-CreateDefects project");
+    assertOK($::N->getProcedure("cq-CreateDefects", "cfgDoesNotExist"),"cfgDoesNotExist procedure exists");
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultShell","cqperl"));
+    assertOK($::N->setProperty("/plugins/EC-DefectTracking/project/defaultResource","cq"));
+    $::gProjectImported = 1;
+}
+
+sub createConfig() {
+    my $xpath = $::N->runProcedure("$::gPlugin_name", 
+        { procedureName => "CreateConfiguration",
+          pollInterval  => '0.2',
+          timeout       => 600,
+          actualParameter => [ 
+            { actualParameterName => 'config', value => "cqConfig" }, 
+            { actualParameterName => 'desc', value => "CQ configuration" }, 
+            { actualParameterName => 'database', value => "SAMPL" },
+            { actualParameterName => 'schema', value => "" }, 
+            { actualParameterName => 'credential', value => "test" }, 
+          ],
+          credential => [ 
+            { credentialName => 'test', userName => "build", password => "Mbimp,vm", },
+          ],
+        });
+
+    assertOK($xpath, "run create configuration procedure");
+    # make sure it finished
+    my $jobId = 0;
+    my $status = "";
+    assertDef($xpath, "runProcedure finished without a timeout");
+    if ($xpath) {
+        $jobId  = $xpath->findvalue("//jobId");
+        $status = $xpath->findvalue("//status");
+
+        assertTrue($jobId && $jobId ne "",'valid job id');
+        assertEq('completed',$status,"job $jobId complete");
+
+        #abort if job did not finish
+        if ($status ne "completed") {
+            assertOK($::N->abortJob($jobId, {force => 1}));
+        }
+    }
+
+    # examine log files
+    $xpath = $::N->getJobDetails($jobId);
+
+    writeFile("$::gCurrentTestDir/createConfiguration.log","====Job Details====\n$xpath->{_xml}\n");
+
+    # check that the config and credential exist
+    $xpath = $::N->getProperty("/projects/$::ECdt/defectTracking_cfgs/cqConfig/defectTrackingPlugin");
+    assertEq("EC-DefectTracking-CQ",$xpath->findvalue("//value")->string_value, "configuration type");
+    $xpath = $::N->getCredential("$::ECdt","cqConfig");
+    assertEq("build",$xpath->findvalue("//userName")->string_value, 'Credential user');
+
+    $::gConfigCreated = 1;
+}
+
+sub doSetup() {
+
+    if(! $::gProjectImported) {
+        importProject();
+    }
+
+    if (! $::gConfigCreated) {
+        createConfig();
+    }
+}
+
+ntest "cfgDoesNotExist", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdcfgDoesNotExist();
+
+    writeFile("$::gCurrentTestDir/cfgDoesNotExist.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Could not find configuration cfgDoesNotExist", $data, "cfgDoesNotExist output");
+};
+
+sub runFakeCmdcfgDoesNotExist
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cfgDoesNotExist ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Could not find configuration cfgDoesNotExist";
+    
+    return $log;
+}
+
+ntest "noDefectsToCreate", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdnoDefectsToCreate();
+
+    writeFile("$::gCurrentTestDir/noDefectsToCreate.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("No Errors, so no Defects to create", $data, "noDefectsToCreate output");
+};
+
+sub runFakeCmdnoDefectsToCreate
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqCfgTestServer ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+No Errors, so no Defects to create
+action createDefects returned: 0";
+    
+    return $log;
+}
+
+ntest "propertiesContainsOneDefect", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertiesContainsOneDefect();
+
+    writeFile("$::gCurrentTestDir/propertiesContainsOneDefect.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock", $data, "propertiesContainsOneDefect output");
+};
+
+sub runFakeCmdpropertiesContainsOneDefect
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqCfgTestServer ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock 
+Error: failed trying to create issue, with error
+ 
+Creating link /commander/pages/EC-DefectTracking-CQ-1.0.0.0/reports?jobId=6012
+Created Defects completed with some Errors
+action createDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "propertiesContainsTwoDefects", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdpropertiesContainsTwoDefects();
+
+    writeFile("$::gCurrentTestDir/propertiesContainsTwoDefects.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock", $data, "propertiesContainsTwoDefects output");
+    assertSubstring("Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock2", $data, "propertiesContainsTwoDefects output");
+};
+
+sub runFakeCmdpropertiesContainsTwoDefects
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqCfgTestServer ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock 
+Error: failed trying to create issue, with error: 
+ 
+Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock2 
+Error: failed trying to create issue, with error: 
+ 
+Creating link /commander/pages/EC-DefectTracking-CQ-1.0.0.0/reports?jobId=6013
+Created Defects completed with some Errors
+action createDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "reportLinkCreated", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdreportLinkCreated();
+
+    writeFile("$::gCurrentTestDir/reportLinkCreated.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Creating link /commander/pages/EC-DefectTracking-CQ-", $data, "reportLinkCreated output");
+};
+
+sub runFakeCmdreportLinkCreated
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqCfgTestServer ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock 
+Error: failed trying to create issue, with error
+ 
+Creating link /commander/pages/EC-DefectTracking-CQ-1.0.0.0/reports?jobId=6014
+Created Defects completed with some Errors
+action createDefects returned: 1";
+    
+    return $log;
+}
+
+ntest "reportLinkCreatedManual", {}, sub {
+
+    # Read the log file and verify its contents.
+    my $data = runFakeCmdreportLinkCreatedManual();
+
+    writeFile("$::gCurrentTestDir/reportLinkCreatedManual.log","====Job Details====\n====LOG====\n$data\n");
+
+    assertSubstring("Creating link /commander/pages/EC-DefectTracking-CQ-", $data, "reportLinkCreatedManual output");
+};
+
+sub runFakeCmdreportLinkCreatedManual
+{
+    my $log= "Getting ECDefectTracking bootstrap code from /myProject/procedure_helpers/bootstrap
+Running boostrap for cqCfgTestServer ...
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Cfg..
+Loading /plugins/EC-DefectTracking-1.1.0.0/project/defectTracking_driver/ECDefectTracking::Base::Driver..
+Trying to get Property /myJob/ecTestFailures/Step35469-testBlockUnblock 
+Creating link /commander/pages/EC-DefectTracking-CQ-1.0.0.0/reports?jobId=6015
+action createDefects returned: ";    
+
+    return $log;
+}
