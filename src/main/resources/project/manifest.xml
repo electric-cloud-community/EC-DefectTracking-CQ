@@ -1,0 +1,35 @@
+<?xml version='1.0' standalone='yes'?>
+<fileset>
+  <file>
+    <path>CQCfg.pm</path>
+    <xpath>//property[propertyName=&quot;ECDefectTracking::CQ::Cfg&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>CQDriver.pm</path>
+    <xpath>//property[propertyName=&quot;ECDefectTracking::CQ::Driver&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>cqCreateConfigForm.xml</path>
+    <xpath>//property[propertyName=&quot;createConfig&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>cqEditConfigForm.xml</path>
+    <xpath>//property[propertyName=&quot;editConfig&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>ec_setup.pl</path>
+    <xpath>//property[propertyName=&quot;ec_setup&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>ec_parameterForm-LinkDefects.xml</path>
+    <xpath>//procedure[procedureName=&quot;LinkDefects&quot;]/propertySheet/property[propertyName=&quot;ec_parameterForm&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>ec_parameterForm-UpdateDefects.xml</path>
+    <xpath>//procedure[procedureName=&quot;UpdateDefects&quot;]/propertySheet/property[propertyName=&quot;ec_parameterForm&quot;]/value</xpath>
+  </file>
+  <file>
+    <path>ec_parameterForm-CreateDefects.xml</path>
+    <xpath>//procedure[procedureName=&quot;CreateDefects&quot;]/propertySheet/property[propertyName=&quot;ec_parameterForm&quot;]/value</xpath>
+  </file>
+</fileset>
